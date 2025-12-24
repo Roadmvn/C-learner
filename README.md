@@ -96,9 +96,9 @@ C-learner/
 ├── module-09-preprocesseur/         # #define, compilation
 ├── module-10-systeme-linux/         # Syscalls, processus Linux
 ├── module-11-systeme-windows/       # Win32 API, processus Windows
-├── module-12-reseau/                # Sockets et protocoles
+├── module-12-shellcode/             # Développement de shellcode
 ├── module-13-injection/             # Injection et manipulation
-├── module-14-evasion/               # Techniques anti-détection
+├── module-14-evasion/               # EDR evasion, syscalls directs
 ├── module-15-projets/               # Projets intégrateurs
 │
 └── ressources/
