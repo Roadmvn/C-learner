@@ -1,0 +1,115 @@
+name: Temporary Sonic 06 select music conversion
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  encode-at3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg python3-pip zip
+
+      - name: Install current Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install yt-dlp
+        run: python3 -m pip install --break-system-packages --upgrade yt-dlp
+
+      - name: Download the E3 2006 track
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          yt-dlp \
+            --no-playlist \
+            --max-downloads 1 \
+            --match-filter "duration >= 115 & duration <= 123" \
+            --extract-audio \
+            --audio-format wav \
+            --audio-quality 0 \
+            --output "work/source.%(ext)s" \
+            "ytsearch10:Theme of Sonic the Hedgehog (E3 2006 Version) - Sonic the Hedgehog OST"
+          test -s work/source.wav
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 work/source.wav
+
+      - name: Prepare 44.1 kHz stereo PCM
+        run: |
+          set -euo pipefail
+          ffmpeg -y -v error -i work/source.wav \
+            -ar 44100 -ac 2 -sample_fmt s16 \
+            -af "atrim=duration=119.222850,asetpts=N/SR/TB" \
+            work/select_input.wav
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels,sample_fmt,duration \
+            -of default=noprint_wrappers=1 work/select_input.wav
+
+      - name: Build ATRAC encoder
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/liangchunn/atracdenc-rs.git work/atracdenc-rs
+          cargo build --release --manifest-path work/atracdenc-rs/Cargo.toml -p atracdenc-cli
+          work/atracdenc-rs/target/release/atracdenc --help | head -40
+
+      - name: Encode PS3 select.at3
+        run: |
+          set -euo pipefail
+          mkdir -p package/ps3/sound
+          work/atracdenc-rs/target/release/atracdenc \
+            -e atrac3 \
+            --container riff \
+            --sony-delay-align \
+            --bitrate 132 \
+            -i work/select_input.wav \
+            -o package/ps3/sound/select.at3
+          test -s package/ps3/sound/select.at3
+
+      - name: Validate complete decoding
+        run: |
+          set -euo pipefail
+          file package/ps3/sound/select.at3
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,codec_long_name,sample_rate,channels,bit_rate,duration \
+            -show_entries format=format_name,duration,size \
+            -of default=noprint_wrappers=1 package/ps3/sound/select.at3
+          ffmpeg -v error -i package/ps3/sound/select.at3 -f null -
+          sha256sum package/ps3/sound/select.at3 | tee package/SHA256.txt
+
+      - name: Package ready-to-copy ZIP
+        run: |
+          cat > package/README_INSTALLATION.txt <<'EOF'
+          SONIC THE HEDGEHOG (2006) - PS3 / RPCS3
+          Character Select Music Replacement
+
+          Fichier remplacé : ps3/sound/select.at3
+
+          Installation :
+          1. Copiez le dossier "ps3" dans le dossier de votre mod ou de votre jeu.
+          2. Acceptez uniquement le remplacement de "select.at3".
+          3. Ne remplacez pas sound.arc : cette archive n'a pas été modifiée.
+
+          Cette archive remplace uniquement la musique du menu de sélection des personnages.
+          EOF
+          (cd package && zip -9 -r ../Sonic06_PS3_Character_Select_E3_2006.zip .)
+          unzip -l Sonic06_PS3_Character_Select_E3_2006.zip
+          sha256sum Sonic06_PS3_Character_Select_E3_2006.zip
+
+      - name: Upload final ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonic06_PS3_Character_Select_E3_2006
+          path: Sonic06_PS3_Character_Select_E3_2006.zip
+          if-no-files-found: error
+          retention-days: 7
