@@ -1,1 +1,1 @@
-Temporary trigger for Sonic 06 PS3 ATRAC conversion. Attempt 2 using direct audio source. Do not merge.
+Temporary trigger for Sonic 06 PS3 ATRAC conversion. Attempt 3 with corrected Sony LP2 options. Do not merge.
