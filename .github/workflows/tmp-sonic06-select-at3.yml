@@ -20,35 +20,28 @@ jobs:
       - name: Install system tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg python3-pip zip
+          sudo apt-get install -y ffmpeg zip
 
       - name: Install current Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install yt-dlp
-        run: python3 -m pip install --break-system-packages --upgrade yt-dlp
-
-      - name: Download the E3 2006 track
+      - name: Download the E3 2006 track directly
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p work
-          yt-dlp \
-            --no-playlist \
-            --max-downloads 1 \
-            --match-filter "duration >= 115 & duration <= 123" \
-            --extract-audio \
-            --audio-format wav \
-            --audio-quality 0 \
-            --output "work/source.%(ext)s" \
-            "ytsearch10:Theme of Sonic the Hedgehog (E3 2006 Version) - Sonic the Hedgehog OST"
-          test -s work/source.wav
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 work/source.wav
+          curl --fail --location --retry 5 --retry-all-errors \
+            --user-agent "Mozilla/5.0" \
+            --output work/source.ogg \
+            "https://static.wikia.nocookie.net/sonic/images/a/a7/Theme_Of_Sonic_The_Hedgehog_~2006_E3_Version~.ogg/revision/latest?cb=20170715081948"
+          test -s work/source.ogg
+          file work/source.ogg
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 work/source.ogg
 
       - name: Prepare 44.1 kHz stereo PCM
         run: |
           set -euo pipefail
-          ffmpeg -y -v error -i work/source.wav \
+          ffmpeg -y -v error -i work/source.ogg \
             -ar 44100 -ac 2 -sample_fmt s16 \
             -af "atrim=duration=119.222850,asetpts=N/SR/TB" \
             work/select_input.wav
