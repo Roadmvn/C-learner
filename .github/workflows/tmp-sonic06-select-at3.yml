@@ -64,7 +64,6 @@ jobs:
             -e atrac3 \
             --container riff \
             --sony-delay-align \
-            --bitrate 132 \
             -i work/select_input.wav \
             -o package/ps3/sound/select.at3
           test -s package/ps3/sound/select.at3
